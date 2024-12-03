@@ -6,8 +6,6 @@ class TokenProcessor:
         self.vocab_size = vocab_size
         self.merges = {}
         self.vocab = {idx: bytes([idx]) for idx in range(256)}
-        self._load_text()
-        self._process_text()
 
     def _load_text(self):
         with open(self.filepath, 'r', encoding='utf-8') as f:
@@ -30,6 +28,7 @@ class TokenProcessor:
 
         for (p0, p1), idx in self.merges.items():
             self.vocab[idx] = self.vocab[p0] + self.vocab[p1]
+        self.tokenized_data = ids
 
     def _get_stats(self, ids, counts=None):
         counts = {} if counts is None else counts
