@@ -9,23 +9,17 @@ processor = TokenProcessor('./data/text.txt')
 processor._load_text()
 processor._process_text()
 
+with open('./data/text.txt', 'r', encoding='utf-8') as f:
+    text = f.read()
+
 # Initialize GPT model with the tokenizer's vocabulary size
-model = GPTLanguageModel(vocab_size=processor.vocab_size)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+data = torch.tensor(processor.encode(text), dtype=torch.long).to(device)
+n = int(0.9*len(data)) # first 90% will be train, rest val
+train_data = data[:n].to(device)
+val_data = data[n:].to(device)
 
-# Prepare data loader
-def create_data_loader(processor, batch_size):
-    data = torch.tensor(processor.tokenized_data, dtype=torch.long)
-    seq_len = 1024
-    n_samples = len(data) - seq_len
-
-    inputs = torch.stack([data[i:i + seq_len] for i in range(n_samples)])
-    targets = torch.stack([data[i + 1:i + seq_len + 1] for i in range(n_samples)])
-
-    dataset = TensorDataset(inputs, targets)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-batch_size = 8
-data_loader = create_data_loader(processor, batch_size=batch_size)
+model = GPTLanguageModel(processor.vocab_size, train_data, val_data)
 
 # Command interface for interacting with the model
 while True:
@@ -38,29 +32,29 @@ while True:
         processor._process_text()
         print("Text tokenized successfully.")
     elif cmd == "save":
-        model.save_model("./data/gpt_model.pth")
-        print("Model saved to './data/gpt_model.pth'.")
+        model.save_model("./data/model.pth")
+        print("Model saved to './data/model.pth'.")
     elif cmd == "load":
         if len(args) < 2:
-            print("Usage: load <file_path>")
+            print("Usaggenee: load <file_path>")
         else:
             model.load_model(args[1])
             print(f"Model loaded from '{args[1]}'.")
     elif cmd == "train":
         print("Starting training...")
-        model.train_model(data_loader, epochs=10)
+        model.train_model()
         print("Training completed.")
     elif cmd == "eval":
         print("Evaluating model...")
         
-        model.evaluate(data_loader)
+        model.evaluate()
     elif cmd == "generate":
         if len(args) < 2:
             print("Usage: generate <num_tokens>")
         else:
             try:
                 num_tokens = int(args[1])
-                context = torch.zeros((1, 1), dtype=torch.long)  # Replace with proper context if available
+                context = torch.zeros((1, 1), dtype=torch.long, device=device)  # Replace with proper context if available
                 generated_tokens = model.generate(context, max_new_tokens=num_tokens)
                 generated_text = processor.decode(generated_tokens[0].tolist())
                 print("Generated text:", generated_text)
